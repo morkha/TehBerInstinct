@@ -1,0 +1,39 @@
+name: Build Garmin IQ
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Download Garmin SDK
+        run: |
+          wget https://developer.garmin.com/downloads/connect-iq/sdks/connectiq-sdk-lin-7.3.0.zip
+          unzip connectiq-sdk-lin-7.3.0.zip
+          echo "$PWD/connectiq-sdk-lin/bin" >> $GITHUB_PATH
+
+      - name: Build Watch Face
+        run: |
+          monkeyc \
+            -o TehBerInstinct.iq \
+            -f monkey.jungle \
+            -y developer_key.der
+
+      - name: Upload IQ Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TehBerInstinct-IQ
+          path: TehBerInstinct.iq
