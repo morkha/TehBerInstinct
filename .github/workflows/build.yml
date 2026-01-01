@@ -1,4 +1,4 @@
-name: Build Connect IQ (Instinct 2X Solar + others)
+name: Build Connect IQ (Multi-device, no separate XML)
 
 on:
   push:
@@ -14,7 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       OUTPUT_BASENAME: TehBerInstinct
-      SDK_DIR: ${{ github.workspace }}/.Garmin  # مسیر SDK موجود در repo
+      SDK_MANAGER_URL: https://developer.garmin.com/downloads/connect-iq/sdk-manager/connectiq-sdk-manager-linux.zip
+      SDK_DIR: ${{ github.workspace }}/.GarminSDK  # مسیر نصب SDK در workspace
 
     steps:
       - name: Checkout
@@ -25,32 +26,54 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y unzip curl openssl
 
-      - name: Verify SDK directory
+      - name: Download and extract Connect IQ SDK Manager
         run: |
-          if [ ! -d "$SDK_DIR/bin" ]; then
-            echo "SDK directory not found at $SDK_DIR"
+          echo "Downloading SDK Manager..."
+          curl -fL "$SDK_MANAGER_URL" -o sdkmanager.zip
+          unzip -q sdkmanager.zip -d sdkmanager || true
+          echo "SDK Manager downloaded and extracted."
+
+      - name: Install Connect IQ SDK
+        run: |
+          # اگر SDK قبلا نصب نشده، نصب کن
+          if [ ! -d "$SDK_DIR" ]; then
+            mkdir -p "$SDK_DIR"
+            # SDK Manager معمولا داخل sdkmanager/connectiq-sdk-* هست
+            SDK_ARCHIVE=$(find sdkmanager -type f -iname 'connectiq-sdk-*-linux-x64.tar.gz' -print -quit || true)
+            if [ -f "$SDK_ARCHIVE" ]; then
+              tar -xzf "$SDK_ARCHIVE" -C "$SDK_DIR" --strip-components=1
+              echo "SDK extracted to $SDK_DIR"
+            else
+              echo "SDK archive not found in sdkmanager. Please ensure SDK Manager downloaded SDK."
+              exit 1
+            fi
+          fi
+
+      - name: Verify SDK binary
+        run: |
+          SDK_BIN="$SDK_DIR/bin/monkeyc"
+          if [ ! -f "$SDK_BIN" ]; then
+            echo "monkeyc not found at $SDK_BIN"
             exit 1
           fi
-          echo "SDK directory found: $SDK_DIR"
-          ls -la "$SDK_DIR/bin"
+          chmod +x "$SDK_BIN"
+          echo "Found monkeyc at $SDK_BIN"
 
       - name: Prepare developer key
         run: |
           if [ -n "${{ secrets.DEVELOPER_KEY }}" ]; then
-            echo "Decoding developer key from secret..."
             echo "${{ secrets.DEVELOPER_KEY }}" | base64 --decode > developer_key.pem
             chmod 600 developer_key.pem
           elif [ -f developer_key.der ]; then
-            echo "Converting developer_key.der -> developer_key.pem"
             if openssl rsa -inform DER -in developer_key.der -out developer_key.pem 2>/dev/null; then
-              echo "Converted with openssl rsa"
+              echo "Converted developer_key.der with openssl rsa"
             else
               openssl pkcs8 -inform DER -in developer_key.der -nocrypt -out developer_key.pem
-              echo "Converted with openssl pkcs8"
+              echo "Converted developer_key.der with openssl pkcs8"
             fi
             chmod 600 developer_key.pem
           else
-            echo "No developer key found. Add developer_key.der to the repo (not recommended) or set DEVELOPER_KEY secret (base64 of PEM)."
+            echo "No developer key found. Set DEVELOPER_KEY secret or add developer_key.der"
             exit 1
           fi
 
@@ -60,10 +83,9 @@ jobs:
             mv recources resources || true
           fi
 
-      - name: Build with monkeyc (multi-device via manifest)
+      - name: Build Connect IQ app
         run: |
           SDK_BIN="$SDK_DIR/bin/monkeyc"
-          chmod +x "$SDK_BIN"
           mkdir -p build
           OUTNAME="${OUTPUT_BASENAME}.iq"
           echo "Output file: build/$OUTNAME"
@@ -75,8 +97,7 @@ jobs:
             -f source/*.mc
 
       - name: List build output
-        run: |
-          ls -la build || true
+        run: ls -la build || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -87,4 +108,4 @@ jobs:
       - name: Security reminder
         if: always()
         run: |
-          echo "If developer key was committed to the repository, please remove it and rotate the key. Use repository secrets instead."
+          echo "If developer key was committed to the repository, remove it and rotate the key. Use secrets instead."
