@@ -13,9 +13,15 @@
             <iq:uses-permission id="Activity"/>
         </iq:permissions>
 
-        <iq:products>
-            <iq:product id="Instinct® 2X Solar"/>
-        </iq:products>
+        <!--
+          If you want to limit to a specific product, use the exact product id
+          from your SDK devices XML. Example (replace with correct id):
+          <iq:products>
+            <iq:product id="instinct_2x_solar"/>
+          </iq:products>
+
+          Leaving products out builds for all supported devices.
+        -->
 
     </iq:application>
 </iq:manifest>
