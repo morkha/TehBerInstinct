@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<iq:manifest version="3"
+    xmlns:iq="http://www.garmin.com/xml/connectiq">
+
+    <iq:application
+        id="com.yourname.tehberinstinct"
+        type="watchface"
+        name="@string/AppName"
+        entry="WatchFace"
+        minSdkVersion="3.4.0">
+
+        <iq:permissions>
+            <iq:uses-permission id="Activity"/>
+        </iq:permissions>
+
+        <iq:products>
+            <iq:product id="Instinct® 2X Solar"/>
+        </iq:products>
+
+    </iq:application>
+</iq:manifest>
