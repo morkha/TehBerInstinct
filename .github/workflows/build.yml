@@ -15,6 +15,8 @@ jobs:
     env:
       OUTPUT_BASENAME: TehBerInstinct
       SDK_MANAGER_URL: https://developer.garmin.com/downloads/connect-iq/sdk-manager/connectiq-sdk-manager-linux.zip
+      SDK_DIR: TehBerInstinct/.Garmin  # مسیر مستقیم SDK
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,27 +33,14 @@ jobs:
           unzip -q sdkmanager.zip -d sdkmanager || true
           ls -la sdkmanager || true
 
-      - name: Try to locate SDK inside extracted SDK Manager or usual places
-        id: findsdk
+      - name: Verify SDK directory
         run: |
-          SDK_DIR=""
-          # 1) check extracted folder
-          SDK_DIR=$(find sdkmanager -type d -name 'connectiq-sdk*' -print -quit || true)
-          # 2) check common home locations (if installer previously installed)
-          if [ -z "$SDK_DIR" ]; then
-            SDK_DIR=$(find $HOME -type d -name 'connectiq-sdk*' -print -quit || true)
-          fi
-          if [ -z "$SDK_DIR" ]; then
-            SDK_DIR=$(find $HOME/.Garmin -type d -name 'connectiq-sdk*' -print -quit || true)
-          fi
-          # If still not found, fail with helpful message
-          if [ -z "$SDK_DIR" ]; then
-            echo "SDK directory not found after extracting the SDK Manager."
-            echo "If the SDK Manager requires interactive install, provide the SDK archive URL (connectiq-sdk-<version>-linux-x64.tar.gz) or place the SDK in the repo."
+          if [ ! -d "$SDK_DIR/bin" ]; then
+            echo "SDK directory not found at $SDK_DIR"
             exit 1
           fi
-          echo "SDK_DIR=$SDK_DIR" >> $GITHUB_ENV
-          ls -la "$SDK_DIR"
+          echo "SDK directory found: $SDK_DIR"
+          ls -la "$SDK_DIR/bin"
 
       - name: Prepare developer key
         run: |
@@ -82,7 +71,6 @@ jobs:
       - name: Find Instinct 2X Solar device XML
         id: finddevice
         run: |
-          DEVICE_XML=""
           DEVICE_XML=$(find "$SDK_DIR" -type f -iname '*instinct*2*solar*.xml' -print -quit || true)
           if [ -z "$DEVICE_XML" ]; then
             DEVICE_XML=$(find "$SDK_DIR" -type f -iname '*instinct*2x*.xml' -print -quit || true)
