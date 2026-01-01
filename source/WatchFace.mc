@@ -1,3 +1,4 @@
+// (updated WatchFace.mc — fixes: remove stray line, parse boolean properties, safer math & padding)
 using Toybox.WatchUi as WatchUi;
 using Toybox.Graphics as Graphics;
 using Toybox.System as System;
@@ -13,14 +14,14 @@ class WatchFace extends WatchUi.WatchFace {
         WatchUi.WatchFace.initialize();
 
         var saved = App.getApp().getProperty("altMode");
-        altMode = (saved != null) ? saved : false;
-        App.getApp().setProperty("altMode", altMode);
+        altMode = (saved != null) ? (saved == "true") : false;
+        App.getApp().setProperty("altMode", altMode ? "true" : "false");
     }
 
     function onKeyLong(key) {
         if (key == WatchUi.KEY_MENU) {
             altMode = !altMode;
-            App.getApp().setProperty("altMode", altMode);
+            App.getApp().setProperty("altMode", altMode ? "true" : "false");
             WatchUi.requestUpdate();
             return true;
         }
@@ -37,47 +38,65 @@ class WatchFace extends WatchUi.WatchFace {
         var minStr = min < 10 ? "0" + min : min;
 
         // ---- Berlin ----
-        var dstOn = App.getApp().getProperty("berlinDST");
+        var dstSaved = App.getApp().getProperty("berlinDST");
+        var dstOn = (dstSaved != null) ? (dstSaved == "true") : false;
+
+        // offset: when DST on, Berlin = TEH + (-1.5), otherwise -2.5
         var offset = dstOn ? -1.5 : -2.5;
 
-        var hourBer = hourTeh + offset;
+        var hourBer = hourTeh;
         var minBer = min;
 
-        if (offset % 1 != 0) {
-            minBer -= 30;
-            if (minBer < 0) {
-                minBer += 60;
-                hourBer -= 1;
+        // handle half-hour offsets safely
+        if (Math.abs(offset % 1) > 0.0001) {
+            // offset has .5 -> adjust hours and minutes
+            var whole = offset > 0 ? Math.floor(offset) : Math.ceil(offset); // handle negatives
+            hourBer += whole;
+            // fractional part (assume .5)
+            if (offset < 0) {
+                minBer -= 30;
+            } else {
+                minBer += 30;
             }
+        } else {
+            hourBer += offset;
         }
-        if (hourBer < 0) hourBer += 24;
-        if (hourBer >= 24) hourBer -= 24;
+
+        // normalize minutes/hours
+        while (minBer < 0) { minBer += 60; hourBer -= 1; }
+        while (minBer >= 60) { minBer -= 60; hourBer += 1; }
+        while (hourBer < 0) hourBer += 24;
+        while (hourBer >= 24) hourBer -= 24;
 
         var minBerStr = minBer < 10 ? "0" + minBer : minBer;
+        var hourTehStr = hourTeh < 10 ? "0" + hourTeh : hourTeh;
+        var hourBerStr = hourBer < 10 ? "0" + hourBer : hourBer;
 
         // ---- Date ----
         var g = Time.Gregorian.info(Time.now(), Time.FORMAT_LONG);
-        var gDateStr = g.year + "." + g.month + "." + g.day;
+        var gDateStr = g.year + "." + (g.month < 10 ? "0" + g.month : g.month) + "." + (g.day < 10 ? "0" + g.day : g.day);
 
         var j = gregorianToJalali(g.year, g.month, g.day);
-        var jDateStr = j.year + "." + j.month + "." + j.day;
+        var jDateStr = j.year + "." + (j.month < 10 ? "0" + j.month : j.month) + "." + (j.day < 10 ? "0" + j.day : j.day);
 
         // ---- Weekday (sub-dial) ----
         var weekDays = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
         var weekDayStr = weekDays[g.dayOfWeek];
 
         // ---- Battery & Steps ----
-        var battery = System.getSystemStats().battery;
-        var steps = Activity.getInfo().steps;
-        if (steps == null) steps = 0;
+        var stats = System.getSystemStats();
+        var battery = stats != null && stats.battery != null ? stats.battery : 0;
+        var activityInfo = Activity.getInfo();
+        var steps = activityInfo != null && activityInfo.steps != null ? activityInfo.steps : 0;
 
         // ---- UI ----
+        // prefer using dc.getWidth()/getHeight() if you change layout dynamically
         if (!altMode) {
             // Normal mode
             dc.drawText(88, 38, Graphics.FONT_SMALL, weekDayStr, Graphics.TEXT_JUSTIFY_CENTER);
             dc.drawText(88, 60, Graphics.FONT_SMALL, jDateStr, Graphics.TEXT_JUSTIFY_CENTER);
             dc.drawText(88, 90, Graphics.FONT_MEDIUM,
-                "TEH " + hourTeh + ":" + minStr,
+                "TEH " + hourTehStr + ":" + minStr,
                 Graphics.TEXT_JUSTIFY_CENTER);
             dc.drawText(88, 115, Graphics.FONT_SMALL,
                 "STP " + steps,
@@ -90,10 +109,10 @@ class WatchFace extends WatchUi.WatchFace {
             dc.drawText(88, 38, Graphics.FONT_SMALL, weekDayStr, Graphics.TEXT_JUSTIFY_CENTER);
             dc.drawText(88, 60, Graphics.FONT_SMALL, gDateStr, Graphics.TEXT_JUSTIFY_CENTER);
             dc.drawText(88, 90, Graphics.FONT_MEDIUM,
-                "TEH " + hourTeh + ":" + minStr,
+                "TEH " + hourTehStr + ":" + minStr,
                 Graphics.TEXT_JUSTIFY_CENTER);
             dc.drawText(88, 115, Graphics.FONT_MEDIUM,
-                "BER " + hourBer + ":" + minBerStr,
+                "BER " + hourBerStr + ":" + minBerStr,
                 Graphics.TEXT_JUSTIFY_CENTER);
             dc.drawText(88, 140, Graphics.FONT_SMALL,
                 "BAT " + battery + "%",
