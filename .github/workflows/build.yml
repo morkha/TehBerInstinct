@@ -1,4 +1,4 @@
-name: Build Connect IQ (Instinct 2X Solar)
+name: Build Connect IQ (Instinct 2X Solar + others)
 
 on:
   push:
@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       OUTPUT_BASENAME: TehBerInstinct
-      SDK_DIR: ${{ github.workspace }}/.Garmin  # مسیر دقیق SDK نسبت به workspace
+      SDK_DIR: ${{ github.workspace }}/.Garmin  # مسیر SDK موجود در repo
 
     steps:
       - name: Checkout
@@ -60,40 +60,18 @@ jobs:
             mv recources resources || true
           fi
 
-      - name: Find Instinct 2X Solar device XML
-        id: finddevice
-        run: |
-          DEVICE_XML=$(find "$SDK_DIR" -type f -iname '*instinct*2*solar*.xml' -print -quit || true)
-          if [ -z "$DEVICE_XML" ]; then
-            DEVICE_XML=$(find "$SDK_DIR" -type f -iname '*instinct*2x*.xml' -print -quit || true)
-          fi
-          if [ -z "$DEVICE_XML" ]; then
-            DEVICE_XML=$(find "$SDK_DIR" -type f -iname '*instinct*2*.xml' -print -quit || true)
-          fi
-          if [ -z "$DEVICE_XML" ]; then
-            DEVICE_XML=$(find "$SDK_DIR" -type f -path '*/devices/*' -name '*.xml' -print -quit || true)
-          fi
-          if [ -z "$DEVICE_XML" ]; then
-            echo "No device xml found in SDK"
-            exit 1
-          fi
-          echo "DEVICE_XML=$DEVICE_XML" >> $GITHUB_ENV
-          echo "Using device: $DEVICE_XML"
-
-      - name: Build with monkeyc (Instinct 2X Solar)
+      - name: Build with monkeyc (multi-device via manifest)
         run: |
           SDK_BIN="$SDK_DIR/bin/monkeyc"
           chmod +x "$SDK_BIN"
           mkdir -p build
-          DEVICE_BASENAME=$(basename "$DEVICE_XML" .xml | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_-' '-')
-          OUTNAME="${OUTPUT_BASENAME}-${DEVICE_BASENAME}.iq"
+          OUTNAME="${OUTPUT_BASENAME}.iq"
           echo "Output file: build/$OUTNAME"
           "$SDK_BIN" \
             -o "build/$OUTNAME" \
             -m manifest.xml \
             -y developer_key.pem \
             -z "$SDK_DIR" \
-            -a "$DEVICE_XML" \
             -f source/*.mc
 
       - name: List build output
