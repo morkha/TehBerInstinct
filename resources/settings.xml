@@ -1,6 +1,6 @@
-settings
-    setting propertyKey=berlinDST type=boolean
-        titleBerlin DSTtitle
-        defaultfalsedefault
-    setting
-settings
+<settings>
+    <setting propertyKey="berlinDST" type="boolean">
+        <title>Berlin DST</title>
+        <default>false</default>
+    </setting>
+</settings>
